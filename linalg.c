@@ -1,106 +1,110 @@
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include "linalg.h"
 
-float *alloc_nD_float_array(int d) {
-	float *out_array = calloc(d, sizeof(float));
-	assert(out_array!=NULL);
-
-	return out_array;
-}
-
-void print_nD_float_array(float *v, int d) {
-	printf("(");
-	for (int i=0; i<(d-1); ++i) {
-		printf("%f, ", *(v+i));
+void print_vec3(vec3 v) {
+	printf("[");
+	for (int i=0; i<(3-1); ++i) {
+		printf("%f, ", v[i]);
 	}
-	printf("%f)\n", *(v+d-1));
+	printf("%f]\n", v[2]);
 }
 
-void add_nD_float_array(float *dest, float *v_1, float *v_2, int d) {
-	for (int i=0; i<d; ++i) {
-		*(dest+i) = *(v_1+i) + *(v_2+i);
+void add_vec3(vec3 r, vec3 v1, vec3 v2) {
+	for (int i=0; i<3; ++i) {
+		r[i] = v1[i] + v2[i];
 	}
 }
 
-void scalar_multi_nD_float_array(float *dest, float c, float *v, int d) {
-	for (int i=0; i<d; ++i) {
-		*(dest+i) = *(v+i) * c;
+void scalar_multi_vec3(vec3 r, float c, vec3 v) {
+	for (int i=0; i<3; ++i) {
+		r[i] = v[i] * c;
 	}
 }
 
-float magnitude_nD_float_array(float *v, int d) {
-	float magnitude = 0;
-	for (int i=0; i<d; ++i) {
-		float entry = *(v+i);
-		magnitude += entry * entry;
+float dotp_vec3(vec3 v1, vec3 v2) {
+	float r = 0.0;
+	for (int i=0; i<3; ++i) {
+		r += v1[i] * v2[i];
 	}
-	return sqrt(magnitude);
+
+	return r;
 }
 
-float euclidian_dist_nD_float_array(float *v_1, float *v_2, int d) {
+float sq_magnitude_vec3(vec3 v) { return dotp_vec3(v, v); }
+
+float sq_euclidian_dist_vec3(vec3 v1, vec3 v2) {
 	float dist = 0;
 	float diff;
-	for (int i=0; i<d; ++i) {
-		diff = *(v_1+i) - *(v_2+i);
+	for (int i=0; i<3; ++i) {
+		diff = v1[i] - v2[i];
 		dist += diff * diff;
 	}
 
-	return (float) sqrt(dist);
+	return dist;
 }
 
-void unit_displacement_nD_float_array(float *dest, float *v_1, float *v_2, int d) {
-	float inv_dist = 1.0/euclidian_dist_nD_float_array(v_1, v_2, d);
-	float *negate_v_2 = alloc_nD_float_array(d);
-	scalar_multi_nD_float_array(negate_v_2, -1, v_2, d);
-	add_nD_float_array(dest, v_1, negate_v_2, d);
-	scalar_multi_nD_float_array(dest, inv_dist, dest, d);
-	free(negate_v_2);
+void unit_displacement_vec3(vec3 r, vec3 v1, vec3 v2) {
+	assert(r!=v1 && r!=v2);
+	float inv_dist = 1.0/sqrt(sq_euclidian_dist_vec3(v1, v2));
+	scalar_multi_vec3(r, -1, v2);
+	add_vec3(r, v1, r);
+	scalar_multi_vec3(r, inv_dist, r);
 }
 
-float *alloc_NxK_float_matrix(int N, int K) {
-	float *out_array = calloc(N*K, sizeof(float));
-	assert(out_array!=NULL);
-
-	return out_array;
-}
-
-void print_NxK_float_matrix(float *m, int N, int K) {
-	for (int i=0; i<N*K; i+=K) {
-		print_nD_float_array((m+i), K);
+void print_mat3(mat3 m) {
+	for (int i=0; i<3; ++i) {
+		print_vec3(&(m[i][0]));
 	}
 }
 
-void set_entry_NxK_float_matrix(float *dest, int i, int j, float x, int N, int K) {
-	*(dest + i*K + j) = x;
-}
-
-float multiply_NxK_float_matrix_entry(float *m_1, float *m_2, int i, int j,
-	int N_1, int K_1, int N_2, int K_2) {
-
+static float multi_mat3_entry(mat3 m1, mat3 m2, int i, int j) {
 	float sum = 0;
-	int i_1, i_2;
-	for (int k=0; k<K_1; ++k) {
-		i_1 = K_1*i + k;
-		i_2 = j + K_2*k;
-		sum += *(m_1 + i_1) * *(m_2 + i_2);
+	for (int k=0; k<3; ++k) {
+		sum += m1[i][k] * m2[k][j];
 	}
 
 	return sum;
 }
 
-void multiply_NxK_float_matrix(float *dest, float *m_1, float *m_2, 
-	int N_1, int K_1, int N_2, int K_2) {
-	assert((dest!=m_1&&dest!=m_2));
-	assert(K_1==N_2);
-	for (int i=0; i<N_1; ++i) {
-		for (int j=0; j<K_2; ++j) {
-			*(dest + K_2*i + j) = 
-				multiply_NxK_float_matrix_entry(m_1, m_2, i, j, 
-					N_1, K_1, N_2, K_2);
+void multi_mat3_mat3(mat3 r, mat3 m1, mat3 m2) {
+	assert(r!=m1 && r!=m2);
+	for (int i=0; i<3; ++i) {
+		for (int j=0; j<3; ++j) {
+			r[i][j] = multi_mat3_entry(m1, m2, i, j);
 		}
 	}
+}
+
+void multi_mat3_vec3(vec3 r, mat3 m, vec3 v) {
+	assert(r!=v);
+	for (int i=0; i<3; ++i) {
+		r[i] = dotp_vec3(v, m[i]);
+	}
+}
+
+void get_3D_rotation_matrix(mat3 r, vec3 rotation) {
+	// src = {yaw, pitch, roll} (yaw rotates radians in xy plane)
+	// applies roll, then pitch, then yaw
+	float sin_yaw = sin(rotation[0]);
+	float cos_yaw = cos(rotation[0]);
+
+	float sin_pitch = sin(rotation[1]);
+	float cos_pitch = cos(rotation[1]);
+
+	float sin_roll = sin(rotation[2]);
+	float cos_roll = cos(rotation[2]);
+
+	r[0][0] = cos_yaw*cos_pitch;
+	r[0][1] = cos_yaw*sin_pitch*sin_roll - sin_yaw*cos_roll;
+	r[0][2] = cos_yaw*sin_pitch*cos_roll + sin_yaw*sin_roll;
+
+	r[1][0] = sin_yaw*cos_pitch;
+	r[1][1] = sin_yaw*sin_pitch*sin_roll + cos_yaw*cos_roll;
+	r[1][2] = sin_yaw*sin_pitch*cos_roll - cos_yaw*sin_roll;
+
+	r[2][0] = -sin_pitch;
+	r[2][1] = cos_pitch*sin_roll;
+	r[2][2] = cos_pitch*cos_roll;
 }

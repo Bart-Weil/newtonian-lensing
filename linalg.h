@@ -1,21 +1,24 @@
-extern float *alloc_nD_float_array(int d);
+typedef float vec3[3];
+typedef float mat3[3][3];
 
-extern void print_nD_float_array(float *v, int d);
+extern void print_vec3(vec3 v);
 
-extern void add_nD_float_array(float *dest, float *v_1, float *v_2, int d);
+extern void add_vec3(vec3 r, vec3 v1, vec3 v2);
 
-extern void scalar_multi_nD_float_array(float *dest, float c, float *v, int d);
+extern void scalar_multi_vec3(vec3 r, float c, vec3 v);
 
-extern float magnitude_nD_float_array(float *v, int d);
+extern float dotp_vec3(vec3 v1, vec3 v2);
 
-extern float euclidian_dist_nD_float_array(float *v_1, float *v_2, int d);
+extern float sq_magnitude_vec3(vec3 v);
 
-extern void unit_displacement_nD_float_array(float *dest, float *v_1, float *v_2, int d);
+extern float sq_euclidian_dist_vec3(vec3 v1, vec3 v2);
 
-extern float *alloc_NxK_float_matrix(int N, int K);
+extern void unit_displacement_vec3(vec3 r, vec3 v1, vec3 v2);
 
-extern void print_NxK_float_matrix(float *m, int N, int K);
+extern void print_mat3(mat3 m);
 
-extern void set_entry_NxK_float_matrix(float *dest, int i, int j, float x, int N, int K);
+extern void multi_mat3_mat3(mat3 r, mat3 m1, mat3 m2);
 
-extern void multiply_NxK_float_matrix(float *dest, float *m_1, float *m_2, int N_1, int K_1, int N_2, int K_2);
+extern void multi_mat3_vec3(vec3 r, mat3 m, vec3 v);
+
+extern void get_3D_rotation_matrix(mat3 r, vec3 rotation);

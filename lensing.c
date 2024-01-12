@@ -3,80 +3,76 @@
 #include <string.h>
 #include <math.h>
 #include <assert.h>
-#include "lensing.h"
+#include "ray.h"
 #include "linalg.h"
 
-float gravitational_acceleration(ray* target_ray, body* target_body) {
-	float r = euclidian_dist_nD_float_array(target_body->coord, target_ray->coord, D);
+#define C 299792458l
+#define D 3
+#define G 0.000000000066743
 
-	return G*(target_body->mass)/((r*r));
+#define STEP 0.00000000001l
+
+#define N_BODIES 1
+
+#define S_RADIUS(m) m*2*G/(C*C)
+
+typedef struct body{
+	float mass;
+	float s_radius;
+	vec3 pos;
+} body_t;
+
+body_t continuum[N_BODIES];
+
+/* Pass by value to compute on the stack without copying from memory */
+static float grav_accel(ray_t tgt_ray, body_t tgt_body) {
+	float r_2 = sq_euclidian_dist_vec3(tgt_body.pos, tgt_ray.pos);
+
+	return 2 * G*(tgt_body.mass)/r_2;
 }
 
-int update_position_single(ray* target_ray, body* target_body) {
-	// check if ray is inside schwarzchild radius
-	if (euclidian_dist_nD_float_array(target_ray->coord, target_body->coord, D)
-		<= target_body->schwarzchild_radius) {
-		return -1;
-	}
-	float accel_magnitude = 2 * gravitational_acceleration(target_ray, target_body);
-	// store old velocity for SUVAT
-	float *v_old = alloc_nD_float_array(D);
-	memcpy(v_old, target_ray->v, D*sizeof(float));
-	// calculate change in velocity
-	float *accel_t = alloc_nD_float_array(D);
-	unit_displacement_nD_float_array(accel_t,
-		target_body->coord, target_ray->coord, D);
-	scalar_multi_nD_float_array(accel_t, STEP*accel_magnitude, accel_t, D);
-	add_nD_float_array(target_ray->v, target_ray->v, accel_t, D);
-	// scale velocity to C
-	float v_scale = magnitude_nD_float_array(target_ray->v, D);
-	scalar_multi_nD_float_array(target_ray->v, C/v_scale, target_ray->v, D);
-	// calculate change in position
-	float *d_coord = alloc_nD_float_array(D);
-	add_nD_float_array(d_coord, v_old, target_ray->v, D);
-	scalar_multi_nD_float_array(d_coord, ((double) STEP)/2, d_coord, D);
-	add_nD_float_array(target_ray->coord, target_ray->coord, d_coord, D);
+status_t update_pos_continuum(ray_t* tgt_ray) {
+	vec3 accel;
+	vec3 v_old;
+	vec3 d_pos;
 
-	free(accel_t);
-	free(v_old);
-	free(d_coord);
+	memcpy(v_old, tgt_ray->v, 3*sizeof(float));
 
-	return 0;
-}
-
-int update_position_continuum(ray* target_ray, continuum target_continuum, int n_bodies) {
-	for (int i=0; i<n_bodies; ++i) {
-		if (update_position_single(target_ray, *(target_continuum+i)) == -1) {
-			return -1;
+	body_t tgt_body;
+	for (int i=0; i<N_BODIES; ++i) {
+		tgt_body = *(continuum+i);
+		/* check if ray is inside schwarzchild radius */
+		if (sq_euclidian_dist_vec3(tgt_ray->pos, tgt_body.pos)
+			<= (tgt_body.s_radius)*(tgt_body.s_radius)) {
+			return ERR;
 		}
+
+		/* compute resultant acceleration */
+		float accel_magnitude = grav_accel(*tgt_ray, tgt_body);
+		unit_displacement_vec3(accel, tgt_body.pos, tgt_ray->pos);
+		scalar_multi_vec3(accel, STEP*accel_magnitude, accel);
+
+		add_vec3(tgt_ray->v, tgt_ray->v, accel);
 	}
+	/* scale velocity to C */
+	float v_scale = C/sqrt(sq_magnitude_vec3(tgt_ray->v));
+	scalar_multi_vec3(tgt_ray->v, v_scale, tgt_ray->v);
+	/* calculate change in position */
+	add_vec3(d_pos, v_old, tgt_ray->v);
+	scalar_multi_vec3(d_pos, ((double) STEP)/2, d_pos);
+	add_vec3(tgt_ray->pos, tgt_ray->pos, d_pos);
+
+	return RUNNING;
+}
+
+int init_tracing() {
+	continuum[0] = (body_t) {.mass = 1e26, .s_radius = S_RADIUS(1e26), 
+		.pos = {0,0,60}};
 	return 0;
 }
 
-float coord_1[3] = {70, 0, 0};
-float coord_2[3] = {45, 0, 0};
-float coord_3[3] = {65, 0, 0};
-
-body body_1 = {
-	.mass = 4e27l,
-	.schwarzchild_radius = k_schwarzchild*4e27,
-	.coord = coord_1
-};
-
-body body_2 = {
-	.mass = 2e27l,
-	.schwarzchild_radius = k_schwarzchild*2e27,
-	.coord = coord_2
-};
-body body_3 = {
-	.mass = 3e27l,
-	.schwarzchild_radius = k_schwarzchild*3e27,
-	.coord = coord_3
-};
-
-body *test_continuum[N_BODIES] = {&body_1, &body_2};
-
-int update_ray(ray* target_ray) {
-
-	return update_position_continuum(target_ray, test_continuum, N_BODIES);
+status_t update_ray(ray_t* tgt_ray) {
+	return update_pos_continuum(tgt_ray);
 }
+
+int terminate_tracing() { return 0; }
